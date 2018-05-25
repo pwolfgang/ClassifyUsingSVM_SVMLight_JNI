@@ -249,7 +249,7 @@ public class Main implements Callable<Void> {
 
     /**
      * Method to consolidate the results of SVM model testing. Each file in the
-     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt contains the result
+     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt; contains the result
      * for each test case against the pair &lt;cat1&gt; &lt;cat2&gt; An
      * intermediate file is created to contain one record for each test
      * consisting of the ID for this test case, the winning category, and the
@@ -337,6 +337,7 @@ public class Main implements Callable<Void> {
      * @param currentID The current ID
      * @param counts The map from category to times this category occurs
      * @param finalOut The printwriter where the result line is written
+     * @throws java.lang.Exception If there is an error.
      */
     public static void summarize(
             String currentID,
