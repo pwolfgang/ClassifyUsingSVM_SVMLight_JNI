@@ -15,10 +15,12 @@
             <id>StemmerFactory</id>
             <url>https://github.com/pwolfgang/StemmerFactory/releases/tag/1.0.0</url>
         </repository>
+<!--
         <repository>
             <id>TestToolsUtil</id>
             <url>https://github.com/pwolfgang/TextToolsUtil/releases/tag/1.1.0</url>
         </repository>
+-->
         <repository>
             <id>FileSort</id>
             <url>https://github.com/pwolfgang/FileSort/releases/tag/1.0.0</url>
@@ -55,7 +57,7 @@
         <dependency>
             <groupId>edu.temple.cla.papolicy.wolfgang.texttools</groupId>
             <artifactId>TextToolsUtil</artifactId>
-            <version>1.1.0</version>
+            <version>1.1.1-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>edu.temple.cla.papolicy.wolfgang.texttools</groupId>
@@ -106,7 +108,7 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib</classpathPrefix>
-                            <mainClass>edu.temple.cla.papolicy.wolfgang.texttools.trainusingsvm.Main</mainClass>
+                            <mainClass>edu.temple.cla.wolfgang.texttools.classifyusingsvm.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>    
