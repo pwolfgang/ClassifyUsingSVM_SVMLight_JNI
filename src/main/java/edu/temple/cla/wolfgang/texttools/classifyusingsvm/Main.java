@@ -57,6 +57,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 import picocli.CommandLine;
 
 /**
@@ -128,7 +129,7 @@ public class Main implements Callable<Void> {
         List<String> ids = new ArrayList<>();
         List<String> ref = new ArrayList<>();
         List<String> lines = new ArrayList<>();
-        List<ArrayList<String>> text = new ArrayList<>();
+        List<List<String>> text = new ArrayList<>();
         List<WordCounter> counts = new ArrayList<>();
         List<SortedMap<Integer, Double>> attributes = new ArrayList<>();
         Vocabulary vocabulary = new Vocabulary();
@@ -146,14 +147,12 @@ public class Main implements Callable<Void> {
                 ref);
         Preprocessor preprocessor = new Preprocessor(doStemming, removeStopWords);
         lines.stream()
-                .map(line -> preprocessor.preprocess(line))
-                .forEach(words -> {
+             .map(line -> preprocessor.preprocess(line))
+             .forEach(words -> {
                     WordCounter counter = new WordCounter();
-                    words.forEach(word -> {
-                        counter.updateCounts(word);
-                        counts.add(counter);
-                    });
-                });
+                    words.forEach(counter::updateCounts);
+                    counts.add(counter);
+            });
         File modelParent = new File(modelDir);
         modelParent.mkdirs();
         File vocabFile = new File(modelParent, "vocab.bin");
