@@ -222,7 +222,10 @@ public class Main implements Callable<Void> {
                     File outputFile = new File(outputDir, "out." + posModel
                             + "." + negModel);
                     List<String> command = new ArrayList<>();
-                    command.add("svm_classify");
+                    command.add("java");
+                    command.add("-jar");
+                    command.add("..\\libsvm\\java\\libsvm.jar");
+                    command.add("svm-predict");
                     command.add(testFile.getPath());
                     command.add(modelFile.getPath());
                     command.add(resultFile.getPath());
