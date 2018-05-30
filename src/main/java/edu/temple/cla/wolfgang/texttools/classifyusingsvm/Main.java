@@ -386,16 +386,20 @@ public class Main implements Callable<Void> {
                                 + tokens[1] + " WHERE "
                                 + idColumn + "='" + tokens[0] + "'";
                         try {
-                            stmt.executeUpdate(query);
-                        } catch (SQLException sqex) {
-                            System.err.println("Error executing update query");
-                            System.err.println(query);
-                            sqex.printStackTrace();
-                            System.err.println("EXITING");
-                            System.exit(1);
+                            stmt.addBatch(query);
+                        } catch (SQLException sqlex) {
+                            throw new RuntimeException("Error adding query " + query + " to batch", sqlex);
                         }
                     }
                 });
+                try {
+                    stmt.executeBatch();
+                } catch (SQLException sqex) {
+                    System.err.println("Error executing update query");
+                    sqex.printStackTrace();
+                    System.err.println("EXITING");
+                    System.exit(1);
+                }
             }
         } catch (Exception ex) {
             ex.printStackTrace();
