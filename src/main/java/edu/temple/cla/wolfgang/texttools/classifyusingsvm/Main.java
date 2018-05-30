@@ -68,37 +68,37 @@ public class Main implements Callable<Void> {
 
     @CommandLine.Option(names = "--datasource", required = true, description = "File containing the datasource properties")
     private String dataSourceFileName;
-    
+
     @CommandLine.Option(names = "--table_name", required = true, description = "The name of the table containing the data")
     private String tableName;
 
     @CommandLine.Option(names = "--id_column", required = true, description = "Column(s) containing the ID")
     private String idColumn;
-    
+
     @CommandLine.Option(names = "--text_column", required = true, description = "Column(s) containing the text")
     private String textColumn;
 
     @CommandLine.Option(names = "--code_column", required = true, description = "Column(s) containing the code")
     private String codeColumn;
-    
+
     @CommandLine.Option(names = "--output_table_name", description = "Table where results are written")
     private String outputTableName;
 
     @CommandLine.Option(names = "--output_code_col", required = true, description = "Column where the result is set")
     private String outputCodeCol;
-    
+
     @CommandLine.Option(names = "--model", description = "Directory where model files are written")
     private String modelDir = "SVM_Model_Dir";
-    
+
     @CommandLine.Option(names = "--feature_dir", description = "Directory where feature files are written")
     private String featureDir = "SVM_Classification_Features";
-    
+
     @CommandLine.Option(names = "--result_dir", description = "Directory for intermediat files")
     private String resultDir = "SVM_Classification_Results";
-    
+
     @CommandLine.Option(names = "--use_even", description = "Use even numbered samples for training")
     private Boolean useEven = false;
-    
+
     @CommandLine.Option(names = "--use_odd", description = "Use odd numbered samples for training")
     private Boolean useOdd = false;
 
@@ -110,17 +110,18 @@ public class Main implements Callable<Void> {
 
     @CommandLine.Option(names = "--do_stemming", description = "Pass all words through stemming algorithm")
     private String doStemming;
-   
+
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
         CommandLine.call(new Main(), System.err, args);
     }
-    
+
     /**
      * Execute the main program. This method is called after the command line
      * parameters have been populated.
+     *
      * @return null.
      */
     @Override
@@ -147,12 +148,12 @@ public class Main implements Callable<Void> {
                 ref);
         Preprocessor preprocessor = new Preprocessor(doStemming, removeStopWords);
         lines.stream()
-             .map(line -> preprocessor.preprocess(line))
-             .forEach(words -> {
+                .map(line -> preprocessor.preprocess(line))
+                .forEach(words -> {
                     WordCounter counter = new WordCounter();
                     words.forEach(counter::updateCounts);
                     counts.add(counter);
-            });
+                });
         File modelParent = new File(modelDir);
         modelParent.mkdirs();
         File vocabFile = new File(modelParent, "vocab.bin");
@@ -251,8 +252,8 @@ public class Main implements Callable<Void> {
 
     /**
      * Method to consolidate the results of SVM model testing. Each file in the
-     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt; contains the result
-     * for each test case against the pair &lt;cat1&gt; &lt;cat2&gt; An
+     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt; contains the
+     * result for each test case against the pair &lt;cat1&gt; &lt;cat2&gt; An
      * intermediate file is created to contain one record for each test
      * consisting of the ID for this test case, the winning category, and the
      * score. This file is sorted by id and winning category. Finally the result
@@ -389,16 +390,21 @@ public class Main implements Callable<Void> {
                                 + tokens[1] + " WHERE "
                                 + idColumn + "='" + tokens[0] + "'";
                         try {
-                            stmt.executeUpdate(query);
-                        } catch (SQLException sqex) {
-                            System.err.println("Error executing update query");
-                            System.err.println(query);
-                            sqex.printStackTrace();
-                            System.err.println("EXITING");
-                            System.exit(1);
+                            stmt.addBatch(query);
+                        } catch (SQLException sqlex) {
+                            throw new RuntimeException("Error adding query " + query + " to batch", sqlex);
                         }
                     }
                 });
+                try {
+                    stmt.executeBatch();
+                } catch (SQLException sqex) {
+                    System.err.println("Error executing update query");
+                    sqex.printStackTrace();
+                    System.err.println("EXITING");
+                    System.exit(1);
+                }
+
             }
         } catch (Exception ex) {
             ex.printStackTrace();
