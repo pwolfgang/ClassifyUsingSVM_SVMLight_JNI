@@ -223,9 +223,9 @@ public class Main implements Callable<Void> {
                             + "." + negModel);
                     List<String> command = new ArrayList<>();
                     command.add("java");
-                    command.add("-jar");
+                    command.add("-cp");
                     command.add("..\\libsvm\\java\\libsvm.jar");
-                    command.add("svm-predict");
+                    command.add("svm_predict");
                     command.add(testFile.getPath());
                     command.add(modelFile.getPath());
                     command.add(resultFile.getPath());
