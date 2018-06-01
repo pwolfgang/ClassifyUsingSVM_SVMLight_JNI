@@ -145,11 +145,9 @@ public class Main implements Callable<Void> {
         List<String> ids = new ArrayList<>();
         List<String> ref = new ArrayList<>();
         List<String> lines = new ArrayList<>();
-        List<List<String>> text = new ArrayList<>();
         List<WordCounter> counts = new ArrayList<>();
         List<SortedMap<Integer, Double>> attributes = new ArrayList<>();
-        Vocabulary vocabulary = new Vocabulary();
-        Map<String, List<SortedMap<Integer, Double>>> trainingSets = new TreeMap<>();
+        Vocabulary vocabulary = null;
         Util.readFromDatabase(dataSourceFileName,
                 tableName,
                 idColumn,
@@ -381,7 +379,7 @@ public class Main implements Callable<Void> {
      *
      * @param dataSourceFileName The file containing the datasource
      * @param tableName The name of the table
-     * @param idColumn The column contining the ID
+     * @param idColumn The column containing the ID
      * @param outputCodeCol The column where the results are set
      * @param resultDir The directory containing the results
      */
