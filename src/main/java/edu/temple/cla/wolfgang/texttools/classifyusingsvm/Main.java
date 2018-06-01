@@ -55,9 +55,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 import picocli.CommandLine;
 
 /**
@@ -66,61 +66,77 @@ import picocli.CommandLine;
  */
 public class Main implements Callable<Void> {
 
-    @CommandLine.Option(names = "--datasource", required = true, description = "File containing the datasource properties")
+    @CommandLine.Option(names = "--datasource", required = true,
+            description = "File containing the datasource properties")
     private String dataSourceFileName;
-    
-    @CommandLine.Option(names = "--table_name", required = true, description = "The name of the table containing the data")
+
+    @CommandLine.Option(names = "--table_name", required = true,
+            description = "The name of the table containing the data")
     private String tableName;
 
-    @CommandLine.Option(names = "--id_column", required = true, description = "Column(s) containing the ID")
+    @CommandLine.Option(names = "--id_column", required = true,
+            description = "Column(s) containing the ID")
     private String idColumn;
-    
-    @CommandLine.Option(names = "--text_column", required = true, description = "Column(s) containing the text")
+
+    @CommandLine.Option(names = "--text_column", required = true,
+            description = "Column(s) containing the text")
     private String textColumn;
 
-    @CommandLine.Option(names = "--code_column", required = true, description = "Column(s) containing the code")
+    @CommandLine.Option(names = "--code_column", required = true,
+            description = "Column(s) containing the code")
     private String codeColumn;
-    
-    @CommandLine.Option(names = "--output_table_name", description = "Table where results are written")
+
+    @CommandLine.Option(names = "--output_table_name",
+            description = "Table where results are written")
     private String outputTableName;
 
-    @CommandLine.Option(names = "--output_code_col", required = true, description = "Column where the result is set")
+    @CommandLine.Option(names = "--output_code_col", required = true,
+            description = "Column where the result is set")
     private String outputCodeCol;
-    
-    @CommandLine.Option(names = "--model", description = "Directory where model files are written")
+
+    @CommandLine.Option(names = "--model",
+            description = "Directory where model files are written")
     private String modelDir = "SVM_Model_Dir";
-    
-    @CommandLine.Option(names = "--feature_dir", description = "Directory where feature files are written")
+
+    @CommandLine.Option(names = "--feature_dir",
+            description = "Directory where feature files are written")
     private String featureDir = "SVM_Classification_Features";
-    
-    @CommandLine.Option(names = "--result_dir", description = "Directory for intermediat files")
+
+    @CommandLine.Option(names = "--result_dir",
+            description = "Directory for intermediat files")
     private String resultDir = "SVM_Classification_Results";
-    
-    @CommandLine.Option(names = "--use_even", description = "Use even numbered samples for training")
+
+    @CommandLine.Option(names = "--use_even",
+            description = "Use even numbered samples for training")
     private Boolean useEven = false;
-    
-    @CommandLine.Option(names = "--use_odd", description = "Use odd numbered samples for training")
+
+    @CommandLine.Option(names = "--use_odd",
+            description = "Use odd numbered samples for training")
     private Boolean useOdd = false;
 
-    @CommandLine.Option(names = "--compute_major", description = "Major code is computed from minor code")
+    @CommandLine.Option(names = "--compute_major",
+            description = "Major code is computed from minor code")
     private Boolean computeMajor = false;
 
-    @CommandLine.Option(names = "--remove_stopwords", description = "Remove common \"stop words\" from the text.")
+    @CommandLine.Option(names = "--remove_stopwords",
+            description = "Remove common \"stop words\" from the text.")
     private String removeStopWords;
 
-    @CommandLine.Option(names = "--do_stemming", description = "Pass all words through stemming algorithm")
+    @CommandLine.Option(names = "--do_stemming",
+            description = "Pass all words through stemming algorithm")
     private String doStemming;
-   
+
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
         CommandLine.call(new Main(), System.err, args);
     }
-    
+
     /**
      * Execute the main program. This method is called after the command line
      * parameters have been populated.
+     *
      * @return null.
      */
     @Override
@@ -147,12 +163,12 @@ public class Main implements Callable<Void> {
                 ref);
         Preprocessor preprocessor = new Preprocessor(doStemming, removeStopWords);
         lines.stream()
-             .map(line -> preprocessor.preprocess(line))
-             .forEach(words -> {
+                .map(line -> preprocessor.preprocess(line))
+                .forEach(words -> {
                     WordCounter counter = new WordCounter();
                     words.forEach(counter::updateCounts);
                     counts.add(counter);
-            });
+                });
         File modelParent = new File(modelDir);
         modelParent.mkdirs();
         File vocabFile = new File(modelParent, "vocab.bin");
@@ -248,8 +264,8 @@ public class Main implements Callable<Void> {
 
     /**
      * Method to consolidate the results of SVM model testing. Each file in the
-     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt; contains the result
-     * for each test case against the pair &lt;cat1&gt; &lt;cat2&gt; An
+     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt; contains the
+     * result for each test case against the pair &lt;cat1&gt; &lt;cat2&gt; An
      * intermediate file is created to contain one record for each test
      * consisting of the ID for this test case, the winning category, and the
      * score. This file is sorted by id and winning category. Finally the result
@@ -376,30 +392,26 @@ public class Main implements Callable<Void> {
             SimpleDataSource sds = new SimpleDataSource(dataSourceFileName);
             File resultFile = new File(resultDir, "final_result.txt");
             try (Connection conn = sds.getConnection();
-                    Statement stmt = conn.createStatement();
-                    BufferedReader in = new BufferedReader(new FileReader(resultFile));) {
-                in.lines().forEach(line -> {
-                    String[] tokens = line.split("\\s+");
-                    if (tokens.length >= 2) {
-                        String query = "UPDATE " + tableName
-                                + " SET " + outputCodeCol + "="
-                                + tokens[1] + " WHERE "
-                                + idColumn + "='" + tokens[0] + "'";
-                        try {
-                            stmt.addBatch(query);
-                        } catch (SQLException sqlex) {
-                            throw new RuntimeException("Error adding query " + query + " to batch", sqlex);
+                    Statement stmt = conn.createStatement();) {
+                stmt.executeUpdate("DROP TABLE IF EXISTS NewCodes");
+                stmt.executeUpdate("CREATE TABLE NewCodes (ID char(11) primary key, Code int)");
+                StringBuilder stb = new StringBuilder("INSERT INTO NewCodes (ID, Code) VALUES");
+                StringJoiner sj = new StringJoiner(",\n");
+                try (BufferedReader in = new BufferedReader(new FileReader(resultFile));) {
+                    in.lines().forEach(line -> {
+                        String[] tokens = line.split("\\s+");
+                        if (tokens.length >= 2) {
+                            sj.add("('" + tokens[0] + "', " + tokens[1] + ")");
                         }
-                    }
-                });
-                try {
-                    stmt.executeBatch();
-                } catch (SQLException sqex) {
-                    System.err.println("Error executing update query");
-                    sqex.printStackTrace();
-                    System.err.println("EXITING");
-                    System.exit(1);
+                    });
                 }
+                stb.append(sj);
+                stmt.executeUpdate(stb.toString());
+                stmt.executeUpdate("UPDATE " + tableName + " join NewCodes on " 
+                        + tableName + ".ID=NewCodes.ID SET " + tableName + "." 
+                        + outputCodeCol + "=NewCodes.Code");
+            } catch (SQLException ex) {
+                throw ex;
             }
         } catch (Exception ex) {
             ex.printStackTrace();
