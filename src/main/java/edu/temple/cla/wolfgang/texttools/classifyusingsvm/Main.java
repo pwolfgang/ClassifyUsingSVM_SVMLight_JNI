@@ -31,21 +31,15 @@
  */
 package edu.temple.cla.wolfgang.texttools.classifyusingsvm;
 
-import edu.temple.cla.papolicy.wolfgang.texttools.util.Greater;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Preprocessor;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.SimpleDataSource;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Util;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Vocabulary;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.WordCounter;
-import edu.temple.cla.wolfgang.filesort.FileSort;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -57,10 +51,10 @@ import java.util.SortedMap;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
-import libsvm.svm;
-import libsvm.svm_model;
-import libsvm.svm_node;
 import picocli.CommandLine;
+import tw.edu.ntu.csie.libsvm.svm;
+import tw.edu.ntu.csie.libsvm.svm_model;
+import tw.edu.ntu.csie.libsvm.svm_node;
 
 /**
  *
