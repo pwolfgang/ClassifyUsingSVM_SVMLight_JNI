@@ -235,18 +235,15 @@ public class Main implements Callable<Void> {
     }
 
     /**
-     * Method to consolidate the results of SVM model testing. Each file in the
-     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt; contains the
-     * result for each test case against the pair &lt;cat1&gt; &lt;cat2&gt; An
-     * intermediate file is created to contain one record for each test
-     * consisting of the ID for this test case, the winning category, and the
-     * score. This file is sorted by id and winning category. Finally the result
-     * file is created consising of one record per id giving the id followed by
-     * the categories in decending order of frequency.
+     * Method to consolidate the results of SVM model testing. Each entry in
+     * the map results contains the results of running each record against
+     * each pair of categories. This is itself a map of category mapped to the
+     * number of times that category was chosen. The category with the highest
+     * count is considered the winning category.
      *
-     * @param results The Map of problems indices to Map of category counts.
+     * @param results The Map of problems indexed to Map of category counts.
      * @param ids A List&lt;String&gt; containing the IDs.
-     * @param categories The result list of computed categories.
+     * @param categories The result list of winning categories.
      */
     public static void consolidateResult(
             SortedMap<Integer, Map<String, Integer>> results,
