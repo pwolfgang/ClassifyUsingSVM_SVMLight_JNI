@@ -22,8 +22,8 @@
         </repository>
 -->
         <repository>
-            <id>FileSort</id>
-            <url>https://github.com/pwolfgang/FileSort/releases/tag/1.0.0</url>
+            <id>libsvm_java</id>
+            <url>https://github.com/pwolfgang/libsvm_java/releases/tag/3.17.1</url>
         </repository>
     </repositories>
     <dependencies>
@@ -58,12 +58,6 @@
             <groupId>edu.temple.cla.papolicy.wolfgang.texttools</groupId>
             <artifactId>TextToolsUtil</artifactId>
             <version>1.1.1-SNAPSHOT</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>tw.edu.ntu.csie</groupId>
-                    <artifactId>libsvm_mod</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>edu.temple.cla.papolicy.wolfgang.texttools</groupId>
@@ -73,7 +67,7 @@
         <dependency>
             <groupId>tw.edu.ntu.csie</groupId>
             <artifactId>libsvm_java</artifactId>
-            <version>3.17.1-SNAPSHOT</version>
+            <version>3.17.1</version>
         </dependency>
     </dependencies>
     <build>
