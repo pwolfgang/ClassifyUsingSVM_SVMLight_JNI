@@ -31,22 +31,15 @@
  */
 package edu.temple.cla.wolfgang.texttools.classifyusingsvm;
 
-import edu.temple.cla.papolicy.wolfgang.texttools.util.Greater;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Preprocessor;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.SimpleDataSource;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Util;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Vocabulary;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.WordCounter;
-import edu.temple.cla.wolfgang.filesort.FileSort;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -55,9 +48,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
+import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
+import tw.edu.ntu.csie.libsvm.svm;
+import tw.edu.ntu.csie.libsvm.svm_model;
+import tw.edu.ntu.csie.libsvm.svm_node;
 
 /**
  *
@@ -65,61 +62,77 @@ import picocli.CommandLine;
  */
 public class Main implements Callable<Void> {
 
-    @CommandLine.Option(names = "--datasource", required = true, description = "File containing the datasource properties")
+    @CommandLine.Option(names = "--datasource", required = true,
+            description = "File containing the datasource properties")
     private String dataSourceFileName;
-    
-    @CommandLine.Option(names = "--table_name", required = true, description = "The name of the table containing the data")
+
+    @CommandLine.Option(names = "--table_name", required = true,
+            description = "The name of the table containing the data")
     private String tableName;
 
-    @CommandLine.Option(names = "--id_column", required = true, description = "Column(s) containing the ID")
+    @CommandLine.Option(names = "--id_column", required = true,
+            description = "Column(s) containing the ID")
     private String idColumn;
-    
-    @CommandLine.Option(names = "--text_column", required = true, description = "Column(s) containing the text")
+
+    @CommandLine.Option(names = "--text_column", required = true,
+            description = "Column(s) containing the text")
     private String textColumn;
 
-    @CommandLine.Option(names = "--code_column", required = true, description = "Column(s) containing the code")
+    @CommandLine.Option(names = "--code_column", required = true,
+            description = "Column(s) containing the code")
     private String codeColumn;
-    
-    @CommandLine.Option(names = "--output_table_name", description = "Table where results are written")
+
+    @CommandLine.Option(names = "--output_table_name",
+            description = "Table where results are written")
     private String outputTableName;
 
-    @CommandLine.Option(names = "--output_code_col", required = true, description = "Column where the result is set")
+    @CommandLine.Option(names = "--output_code_col", required = true,
+            description = "Column where the result is set")
     private String outputCodeCol;
-    
-    @CommandLine.Option(names = "--model", description = "Directory where model files are written")
+
+    @CommandLine.Option(names = "--model",
+            description = "Directory where model files are written")
     private String modelDir = "SVM_Model_Dir";
-    
-    @CommandLine.Option(names = "--feature_dir", description = "Directory where feature files are written")
+
+    @CommandLine.Option(names = "--feature_dir",
+            description = "Directory where feature files are written")
     private String featureDir = "SVM_Classification_Features";
-    
-    @CommandLine.Option(names = "--result_dir", description = "Directory for intermediat files")
+
+    @CommandLine.Option(names = "--result_dir",
+            description = "Directory for intermediat files")
     private String resultDir = "SVM_Classification_Results";
-    
-    @CommandLine.Option(names = "--use_even", description = "Use even numbered samples for training")
+
+    @CommandLine.Option(names = "--use_even",
+            description = "Use even numbered samples for training")
     private Boolean useEven = false;
-    
-    @CommandLine.Option(names = "--use_odd", description = "Use odd numbered samples for training")
+
+    @CommandLine.Option(names = "--use_odd",
+            description = "Use odd numbered samples for training")
     private Boolean useOdd = false;
 
-    @CommandLine.Option(names = "--compute_major", description = "Major code is computed from minor code")
+    @CommandLine.Option(names = "--compute_major",
+            description = "Major code is computed from minor code")
     private Boolean computeMajor = false;
 
-    @CommandLine.Option(names = "--remove_stopwords", description = "Remove common \"stop words\" from the text.")
+    @CommandLine.Option(names = "--remove_stopwords",
+            description = "Remove common \"stop words\" from the text.")
     private String removeStopWords;
 
-    @CommandLine.Option(names = "--do_stemming", description = "Pass all words through stemming algorithm")
+    @CommandLine.Option(names = "--do_stemming",
+            description = "Pass all words through stemming algorithm")
     private String doStemming;
-   
+
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
         CommandLine.call(new Main(), System.err, args);
     }
-    
+
     /**
      * Execute the main program. This method is called after the command line
      * parameters have been populated.
+     *
      * @return null.
      */
     @Override
@@ -128,11 +141,7 @@ public class Main implements Callable<Void> {
         List<String> ids = new ArrayList<>();
         List<String> ref = new ArrayList<>();
         List<String> lines = new ArrayList<>();
-        List<ArrayList<String>> text = new ArrayList<>();
-        List<WordCounter> counts = new ArrayList<>();
-        List<SortedMap<Integer, Double>> attributes = new ArrayList<>();
-        Vocabulary vocabulary = new Vocabulary();
-        Map<String, List<SortedMap<Integer, Double>>> trainingSets = new TreeMap<>();
+        Vocabulary vocabulary;
         Util.readFromDatabase(dataSourceFileName,
                 tableName,
                 idColumn,
@@ -144,42 +153,28 @@ public class Main implements Callable<Void> {
                 ids,
                 lines,
                 ref);
-        Preprocessor preprocessor = new Preprocessor(doStemming, removeStopWords);
-        lines.stream()
-                .map(line -> preprocessor.preprocess(line))
-                .forEach(words -> {
-                    WordCounter counter = new WordCounter();
-                    words.forEach(word -> {
-                        counter.updateCounts(word);
-                        counts.add(counter);
-                    });
-                });
+        List<svm_node[]> problems = new ArrayList<>();
         File modelParent = new File(modelDir);
-        modelParent.mkdirs();
         File vocabFile = new File(modelParent, "vocab.bin");
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(vocabFile))) {
             vocabulary = (Vocabulary) ois.readObject();
+            Preprocessor preprocessor = new Preprocessor(doStemming, removeStopWords);
+            lines.stream()
+                    .map(line -> preprocessor.preprocess(line))
+                    .forEach(words -> {
+                        WordCounter counter = new WordCounter();
+                        words.forEach(counter::updateCounts);
+                        problems.add(Util.convereToSVMNode(Util.computeAttributes(counter, vocabulary, 0.0)));
+                    });
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(1);
         }
-        for (WordCounter counter : counts) {
-            attributes.add(Util.computeAttributes(counter, vocabulary, 0.0));
-        }
-        File featureDirFile = new File(featureDir);
-        Util.delDir(featureDirFile);
-        featureDirFile.mkdirs();
-        File featureOutputFile = new File(featureDirFile, "testset");
-        try (PrintWriter out = new PrintWriter(new FileWriter(featureOutputFile))) {
-            for (SortedMap<Integer, Double> features : attributes) {
-                Util.writeFeatureLine(out, 0, features);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
-        }
-        classifyTest(modelParent, featureOutputFile, resultDir);
-        consolidateResult(new File(resultDir), ids);
+        SortedMap<Integer, Map<String, Integer>> results = new TreeMap<>();
+        classifyTest(modelParent, problems, results);
+        List<Integer> categories = new ArrayList<>();
+        System.err.println("Consolidating Results");
+        consolidateResult(results, ids, categories);
         String outputTable = outputTableName != null ? outputTableName : tableName;
         if (outputCodeCol != null) {
             System.err.println("Inserting result into database");
@@ -187,7 +182,8 @@ public class Main implements Callable<Void> {
                     outputTable,
                     idColumn,
                     outputCodeCol,
-                    resultDir);
+                    ids,
+                    categories);
         }
         System.err.println("SUCESSFUL COMPLETION");
         return null;
@@ -197,165 +193,70 @@ public class Main implements Callable<Void> {
      * Function to run the test file agains each of the SVM models
      *
      * @param modelDir The the directory containg the models
-     * @param testFile The the test file
-     * @param outputDir The name of the output directory
+     * @param problems The list of problems to be classified
+     * @param results Map of problem indices vs list of results.
      */
     public static void classifyTest(
             File modelDir,
-            File testFile,
-            String outputDir) {
-        try {
-            File outputDirFile = new File(outputDir);
-            Util.delDir(outputDirFile);
-            outputDirFile.mkdirs();
-            String[] modelFileNames = modelDir.list();
-            ProcessBuilder pb = new ProcessBuilder();
-            for (String modelFileName : modelFileNames) {
-                if (modelFileName.startsWith("svm")) {
-                    int posFirstDot = modelFileName.indexOf('.');
-                    int posSecondDot = modelFileName.indexOf('.', posFirstDot + 1);
-                    String posModel
-                            = modelFileName.substring(posFirstDot + 1, posSecondDot);
-                    String negModel = modelFileName.substring(posSecondDot + 1);
-                    File modelFile = new File(modelDir, modelFileName);
-                    File resultFile = new File(outputDir, "result." + posModel
-                            + "." + negModel);
-                    File outputFile = new File(outputDir, "out." + posModel
-                            + "." + negModel);
-                    List<String> command = new ArrayList<>();
-                    command.add("svm_classify");
-                    command.add(testFile.getPath());
-                    command.add(modelFile.getPath());
-                    command.add(resultFile.getPath());
-                    pb.command(command);
-                    Process p = pb.start();
-                    System.out.println(command);
-                    InputStream processOut = p.getInputStream();
-                    BufferedReader rdr = new BufferedReader(new InputStreamReader(processOut));
-                    try (PrintWriter pwtr = new PrintWriter(new FileWriter(outputFile))) {
-                        String line;
-                        while ((line = rdr.readLine()) != null) {
-                            pwtr.println(line);
-                        }
+            List<svm_node[]> problems,
+            SortedMap<Integer,Map<String, Integer>> results) {
+        String[] modelFileNames = modelDir.list();
+        for (String modelFileName : modelFileNames) {
+            if (modelFileName.startsWith("svm")) {
+                int posFirstDot = modelFileName.indexOf('.');
+                int posSecondDot = modelFileName.indexOf('.', posFirstDot + 1);
+                String posModel
+                        = modelFileName.substring(posFirstDot + 1, posSecondDot);
+                String negModel = modelFileName.substring(posSecondDot + 1);
+                File modelFile = new File(modelDir, modelFileName);
+                svm_model model = null;
+                System.out.println("Reading model " + modelFile);
+                try {
+                    model = svm.svm_load_model(modelFile.getPath());
+                } catch (IOException ioex) {
+                    throw new RuntimeException("Error reading model", ioex);
+                }
+                for (int i = 0; i < problems.size(); i++) {
+                    double result = svm.svm_predict(model, problems.get(i));
+                    Map<String, Integer> resultMap = results.getOrDefault(i, new HashMap<>());
+                    if (result > 0) {
+                        int countOfCat = resultMap.getOrDefault(posModel, 0);
+                        countOfCat++;
+                        resultMap.put(posModel, countOfCat);
+                    } else {
+                        int countOfCat = resultMap.getOrDefault(negModel, 0);
+                        countOfCat++;
+                        resultMap.put(negModel, countOfCat);
                     }
-                    p.waitFor();
+                    results.put(i, resultMap);
                 }
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
         }
     }
 
     /**
-     * Method to consolidate the results of SVM model testing. Each file in the
-     * resultDir of the form result.&lt;cat1&gt;.&lt;cat2&gt; contains the result
-     * for each test case against the pair &lt;cat1&gt; &lt;cat2&gt; An
-     * intermediate file is created to contain one record for each test
-     * consisting of the ID for this test case, the winning category, and the
-     * score. This file is sorted by id and winning category. Finally the result
-     * file is created consising of one record per id giving the id followed by
-     * the categories in decending order of frequency.
+     * Method to consolidate the results of SVM model testing. Each entry in
+     * the map results contains the results of running each record against
+     * each pair of categories. This is itself a map of category mapped to the
+     * number of times that category was chosen. The category with the highest
+     * count is considered the winning category.
      *
-     * @param resultDir The directory containing the result files
+     * @param results The Map of problems indexed to Map of category counts.
      * @param ids A List&lt;String&gt; containing the IDs.
+     * @param categories The result list of winning categories.
      */
     public static void consolidateResult(
-            File resultDir,
-            List<String> ids) {
-        try {
-            String[] resultFileNames = resultDir.list();
-            File temp = new File(resultDir, "temp");
-            try (PrintWriter tempOut = new PrintWriter(new FileWriter(temp))) {
-                System.out.println("Building consilidated result file");
-                for (String resultFileName : resultFileNames) {
-                    if (resultFileName.startsWith("result.")) {
-                        int posFirstDot = resultFileName.indexOf('.');
-                        int posSecondDot = resultFileName.indexOf('.', posFirstDot + 1);
-                        String posModel = resultFileName.substring(posFirstDot + 1,
-                                posSecondDot);
-                        String negModel = resultFileName.substring(posSecondDot + 1);
-                        System.out.println("Reading " + resultFileName);
-                        try (BufferedReader in = new BufferedReader(new FileReader(new File(resultDir,
-                                resultFileName)))) {
-                            int index = -1;
-                            String line;
-                            String winner;
-                            String looser;
-                            double score;
-                            while ((line = in.readLine()) != null) {
-                                ++index;
-                                score = Double.parseDouble(line);
-                                if (score < 0.0) {
-                                    winner = negModel;
-                                    looser = posModel;
-                                    score = -score;
-                                } else {
-                                    winner = posModel;
-                                    looser = negModel;
-                                }
-                                tempOut.printf("%s %s %f", ids.get(index), winner, score);
-                                tempOut.println();
-                            }
-                        }
-                    }
-                }
-            }
-            File sortedTemp = new File(resultDir, "sortedTemp");
-            System.out.println("Begin Sort");
-            FileSort.sort(temp.getAbsolutePath(), sortedTemp.getAbsolutePath(),
-                    resultDir, Long.MAX_VALUE);
-            System.out.println("End Sort");
-            BufferedReader sortedInput
-                    = new BufferedReader(new FileReader(sortedTemp));
-            File finalResult = new File(resultDir, "final_result.txt");
-            try (PrintWriter finalOut = new PrintWriter(new FileWriter(finalResult))) {
-                String currentId = null;
-                String line;
-                Map<String, Integer> counts = new HashMap<>();
-                while ((line = sortedInput.readLine()) != null) {
-                    String[] tokens = line.split("\\s+");
-                    if (!tokens[0].equals(currentId)) {
-                        summarize(currentId, counts, finalOut);
-                        currentId = tokens[0];
-                    }
-                    Integer count = counts.getOrDefault(tokens[1], 0);
-                    count = count + 1;
-                    counts.put(tokens[1], count);
-                }
-                summarize(currentId, counts, finalOut);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
+            SortedMap<Integer, Map<String, Integer>> results,
+            List<String> ids,
+            List<Integer> categories) {
+        for (int i = 0; i < ids.size(); i++) {
+            Map<String, Integer> result = results.get(i);
+            SortedMap<Integer, String> invertedResult = new TreeMap<>();
+            result.forEach((k, v) -> invertedResult.put(v, k));
+            Integer maxKey = invertedResult.lastKey();
+            String winningCategory = invertedResult.get(maxKey);
+            categories.add(new Integer(winningCategory));
         }
-    }
-
-    /**
-     * Method to summarize the results for a given ID
-     *
-     * @param currentID The current ID
-     * @param counts The map from category to times this category occurs
-     * @param finalOut The printwriter where the result line is written
-     * @throws java.lang.Exception If there is an error.
-     */
-    public static void summarize(
-            String currentID,
-            Map<String, Integer> counts,
-            PrintWriter finalOut) throws Exception {
-        if (currentID == null) {
-            return;
-        }
-        SortedMap<Integer, String> sortedMap
-                = new TreeMap<>(new Greater<>());
-        counts.forEach((k, v) -> sortedMap.put(v, k));
-        finalOut.print(currentID);
-        sortedMap.forEach((k, v) -> {
-            finalOut.print(" ");
-            finalOut.print(v);
-        });
-        finalOut.println();
-        counts.clear();
     }
 
     /**
@@ -363,40 +264,36 @@ public class Main implements Callable<Void> {
      *
      * @param dataSourceFileName The file containing the datasource
      * @param tableName The name of the table
-     * @param idColumn The column contining the ID
+     * @param idColumn The column containing the ID
      * @param outputCodeCol The column where the results are set
-     * @param resultDir The directory containing the results
+     * @param ids The list of ids
+     * @param cats The corresponding list if categories.
      */
     public static void outputToDatabase(
             String dataSourceFileName,
             String tableName,
             String idColumn,
             String outputCodeCol,
-            String resultDir) {
+            List<String> ids,
+            List<Integer> cats) {
         try {
             SimpleDataSource sds = new SimpleDataSource(dataSourceFileName);
-            File resultFile = new File(resultDir, "final_result.txt");
             try (Connection conn = sds.getConnection();
-                    Statement stmt = conn.createStatement();
-                    BufferedReader in = new BufferedReader(new FileReader(resultFile));) {
-                in.lines().forEach(line -> {
-                    String[] tokens = line.split("\\s+");
-                    if (tokens.length >= 2) {
-                        String query = "UPDATE " + tableName
-                                + " SET " + outputCodeCol + "="
-                                + tokens[1] + " WHERE "
-                                + idColumn + "='" + tokens[0] + "'";
-                        try {
-                            stmt.executeUpdate(query);
-                        } catch (SQLException sqex) {
-                            System.err.println("Error executing update query");
-                            System.err.println(query);
-                            sqex.printStackTrace();
-                            System.err.println("EXITING");
-                            System.exit(1);
-                        }
-                    }
-                });
+                    Statement stmt = conn.createStatement();) {
+                stmt.executeUpdate("DROP TABLE IF EXISTS NewCodes");
+                stmt.executeUpdate("CREATE TABLE NewCodes (ID char(11) primary key, Code int)");
+                StringBuilder stb = new StringBuilder("INSERT INTO NewCodes (ID, Code) VALUES");
+                StringJoiner sj = new StringJoiner(",\n");
+                for (int i = 0; i < ids.size(); i++) {
+                    sj.add(String.format("(\'%s\', %d)", ids.get(i), cats.get(i)));
+                }
+                stb.append(sj);
+                stmt.executeUpdate(stb.toString());
+                stmt.executeUpdate("UPDATE " + tableName + " join NewCodes on "
+                        + tableName + ".ID=NewCodes.ID SET " + tableName + "."
+                        + outputCodeCol + "=NewCodes.Code");
+            } catch (SQLException ex) {
+                throw ex;
             }
         } catch (Exception ex) {
             ex.printStackTrace();
