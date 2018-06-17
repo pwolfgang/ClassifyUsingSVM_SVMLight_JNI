@@ -143,9 +143,7 @@ public class Main implements Callable<Void> {
         String outputTable = outputTableName != null ? outputTableName : commonFrontEnd.getTableName();
         if (outputCodeCol != null) {
             System.err.println("Inserting result into database");
-            outputToDatabase(commonFrontEnd.getDataSourceFileName(),
-                    outputTable,
-                    commonFrontEnd.getIdColumn(),
+            commonFrontEnd.outputToDatabase(outputTable,
                     outputCodeCol,
                     ids,
                     categories);
@@ -224,45 +222,4 @@ public class Main implements Callable<Void> {
         }
     }
 
-    /**
-     * Method to write the classification results to the database
-     *
-     * @param dataSourceFileName The file containing the datasource
-     * @param tableName The name of the table
-     * @param idColumn The column containing the ID
-     * @param outputCodeCol The column where the results are set
-     * @param ids The list of ids
-     * @param cats The corresponding list if categories.
-     */
-    public static void outputToDatabase(
-            String dataSourceFileName,
-            String tableName,
-            String idColumn,
-            String outputCodeCol,
-            List<String> ids,
-            List<Integer> cats) {
-        try {
-            SimpleDataSource sds = new SimpleDataSource(dataSourceFileName);
-            try (Connection conn = sds.getConnection();
-                    Statement stmt = conn.createStatement();) {
-                stmt.executeUpdate("DROP TABLE IF EXISTS NewCodes");
-                stmt.executeUpdate("CREATE TABLE NewCodes (ID char(11) primary key, Code int)");
-                StringBuilder stb = new StringBuilder("INSERT INTO NewCodes (ID, Code) VALUES");
-                StringJoiner sj = new StringJoiner(",\n");
-                for (int i = 0; i < ids.size(); i++) {
-                    sj.add(String.format("(\'%s\', %d)", ids.get(i), cats.get(i)));
-                }
-                stb.append(sj);
-                stmt.executeUpdate(stb.toString());
-                stmt.executeUpdate("UPDATE " + tableName + " join NewCodes on "
-                        + tableName + ".ID=NewCodes.ID SET " + tableName + "."
-                        + outputCodeCol + "=NewCodes.Code");
-            } catch (SQLException ex) {
-                throw ex;
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
-        }
-    }
 }
