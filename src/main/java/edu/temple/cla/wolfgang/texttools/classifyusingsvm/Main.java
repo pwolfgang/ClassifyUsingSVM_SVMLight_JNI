@@ -32,8 +32,6 @@
 package edu.temple.cla.wolfgang.texttools.classifyusingsvm;
 
 import edu.temple.cla.papolicy.wolfgang.texttools.util.CommonFrontEnd;
-import edu.temple.cla.papolicy.wolfgang.texttools.util.Preprocessor;
-import edu.temple.cla.papolicy.wolfgang.texttools.util.SimpleDataSource;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Util;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Vocabulary;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.WordCounter;
@@ -41,15 +39,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
-import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -112,16 +106,12 @@ public class Main implements Callable<Void> {
     @Override
     public Void call() {
 
-        List<String> ids = new ArrayList<>();
-        List<String> ref = new ArrayList<>();
-        List<String> lines = new ArrayList<>();
-        List<WordCounter> counts = new ArrayList<>();
-        Vocabulary problemVocab = new Vocabulary(); // Not used
         CommonFrontEnd commonFrontEnd = new CommonFrontEnd();
         CommandLine commandLine = new CommandLine(commonFrontEnd);
         commandLine.setUnmatchedArgumentsAllowed(true);
         commandLine.parse(args);
-        commonFrontEnd.loadData(ids, ref, problemVocab, counts);
+        List<Map<String, Object>> cases = new ArrayList<>();
+        Vocabulary unusedVocab = commonFrontEnd.loadData(cases);
         List<svm_node[]> problems = new ArrayList<>();
         File modelParent = new File(modelDir);
         File vocabFile = new File(modelParent, "vocab.bin");
@@ -132,21 +122,19 @@ public class Main implements Callable<Void> {
             ex.printStackTrace();
             System.exit(1);
         }
-        for (WordCounter count : counts) {
-            problems.add(Util.convereToSVMNode(Util.computeAttributes(count, vocabulary, 0)));    
+        for (Map<String, Object> c : cases) {
+            problems.add(Util.convereToSVMNode(Util.computeAttributes((WordCounter)c.get("counts"), vocabulary, 0)));    
         }
         SortedMap<Integer, Map<String, Integer>> results = new TreeMap<>();
         classifyTest(modelParent, problems, results);
-        List<Integer> categories = new ArrayList<>();
         System.err.println("Consolidating Results");
-        consolidateResult(results, ids, categories);
+        consolidateResult(results, cases);
         String outputTable = outputTableName != null ? outputTableName : commonFrontEnd.getTableName();
         if (outputCodeCol != null) {
             System.err.println("Inserting result into database");
             commonFrontEnd.outputToDatabase(outputTable,
                     outputCodeCol,
-                    ids,
-                    categories);
+                    cases);
         }
         System.err.println("SUCESSFUL COMPLETION");
         return null;
@@ -162,7 +150,7 @@ public class Main implements Callable<Void> {
     public static void classifyTest(
             File modelDir,
             List<svm_node[]> problems,
-            SortedMap<Integer,Map<String, Integer>> results) {
+            SortedMap<Integer, Map<String, Integer>> results) {
         String[] modelFileNames = modelDir.list();
         for (String modelFileName : modelFileNames) {
             if (modelFileName.startsWith("svm")) {
@@ -205,20 +193,18 @@ public class Main implements Callable<Void> {
      * count is considered the winning category.
      *
      * @param results The Map of problems indexed to Map of category counts.
-     * @param ids A List&lt;String&gt; containing the IDs.
-     * @param categories The result list of winning categories.
+     * @param cases The list of cases to be classified.
      */
     public static void consolidateResult(
             SortedMap<Integer, Map<String, Integer>> results,
-            List<String> ids,
-            List<Integer> categories) {
-        for (int i = 0; i < ids.size(); i++) {
+            List<Map<String, Object>> cases) {
+        for (int i = 0; i < cases.size(); i++) {
             Map<String, Integer> result = results.get(i);
             SortedMap<Integer, String> invertedResult = new TreeMap<>();
             result.forEach((k, v) -> invertedResult.put(v, k));
             Integer maxKey = invertedResult.lastKey();
             String winningCategory = invertedResult.get(maxKey);
-            categories.add(new Integer(winningCategory));
+            cases.get(i).put("newCode", new Integer(winningCategory));
         }
     }
 
