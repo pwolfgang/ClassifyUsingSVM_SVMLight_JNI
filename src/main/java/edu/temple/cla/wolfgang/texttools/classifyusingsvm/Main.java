@@ -31,6 +31,7 @@
  */
 package edu.temple.cla.wolfgang.texttools.classifyusingsvm;
 
+import edu.temple.cla.papolicy.wolfgang.texttools.util.CommonFrontEnd;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Preprocessor;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.SimpleDataSource;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Util;
@@ -61,27 +62,7 @@ import tw.edu.ntu.csie.libsvm.svm_node;
  * @author Paul Wolfgang
  */
 public class Main implements Callable<Void> {
-
-    @CommandLine.Option(names = "--datasource", required = true,
-            description = "File containing the datasource properties")
-    private String dataSourceFileName;
-
-    @CommandLine.Option(names = "--table_name", required = true,
-            description = "The name of the table containing the data")
-    private String tableName;
-
-    @CommandLine.Option(names = "--id_column", required = true,
-            description = "Column(s) containing the ID")
-    private String idColumn;
-
-    @CommandLine.Option(names = "--text_column", required = true,
-            description = "Column(s) containing the text")
-    private String textColumn;
-
-    @CommandLine.Option(names = "--code_column", required = true,
-            description = "Column(s) containing the code")
-    private String codeColumn;
-
+    
     @CommandLine.Option(names = "--output_table_name",
             description = "Table where results are written")
     private String outputTableName;
@@ -102,32 +83,25 @@ public class Main implements Callable<Void> {
             description = "Directory for intermediat files")
     private String resultDir = "SVM_Classification_Results";
 
-    @CommandLine.Option(names = "--use_even",
-            description = "Use even numbered samples for training")
-    private Boolean useEven = false;
-
-    @CommandLine.Option(names = "--use_odd",
-            description = "Use odd numbered samples for training")
-    private Boolean useOdd = false;
-
-    @CommandLine.Option(names = "--compute_major",
-            description = "Major code is computed from minor code")
-    private Boolean computeMajor = false;
-
-    @CommandLine.Option(names = "--remove_stopwords",
-            description = "Remove common \"stop words\" from the text.")
-    private String removeStopWords;
-
-    @CommandLine.Option(names = "--do_stemming",
-            description = "Pass all words through stemming algorithm")
-    private String doStemming;
-
+    private final String[] args;
+    
+    public Main(String[] args) {
+        this.args = args;
+    }
     /**
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        CommandLine.call(new Main(), System.err, args);
+        Main main = new Main(args);
+        CommandLine commandLine = new CommandLine(main);
+        commandLine.setUnmatchedArgumentsAllowed(true).parse(args);
+        try {
+            main.call();
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
+
 
     /**
      * Execute the main program. This method is called after the command line
@@ -141,46 +115,35 @@ public class Main implements Callable<Void> {
         List<String> ids = new ArrayList<>();
         List<String> ref = new ArrayList<>();
         List<String> lines = new ArrayList<>();
-        Vocabulary vocabulary;
-        Util.readFromDatabase(dataSourceFileName,
-                tableName,
-                idColumn,
-                textColumn,
-                codeColumn,
-                computeMajor,
-                useEven,
-                useOdd,
-                ids,
-                lines,
-                ref);
+        List<WordCounter> counts = new ArrayList<>();
+        Vocabulary problemVocab = new Vocabulary(); // Not used
+        CommonFrontEnd commonFrontEnd = new CommonFrontEnd();
+        CommandLine commandLine = new CommandLine(commonFrontEnd);
+        commandLine.setUnmatchedArgumentsAllowed(true);
+        commandLine.parse(args);
+        commonFrontEnd.loadData(ids, ref, problemVocab, counts);
         List<svm_node[]> problems = new ArrayList<>();
         File modelParent = new File(modelDir);
         File vocabFile = new File(modelParent, "vocab.bin");
+        Vocabulary vocabulary = null; //The model vocabulary
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(vocabFile))) {
             vocabulary = (Vocabulary) ois.readObject();
-            Preprocessor preprocessor = new Preprocessor(doStemming, removeStopWords);
-            lines.stream()
-                    .map(line -> preprocessor.preprocess(line))
-                    .forEach(words -> {
-                        WordCounter counter = new WordCounter();
-                        words.forEach(counter::updateCounts);
-                        problems.add(Util.convereToSVMNode(Util.computeAttributes(counter, vocabulary, 0.0)));
-                    });
         } catch (Exception ex) {
             ex.printStackTrace();
             System.exit(1);
+        }
+        for (WordCounter count : counts) {
+            problems.add(Util.convereToSVMNode(Util.computeAttributes(count, vocabulary, 0)));    
         }
         SortedMap<Integer, Map<String, Integer>> results = new TreeMap<>();
         classifyTest(modelParent, problems, results);
         List<Integer> categories = new ArrayList<>();
         System.err.println("Consolidating Results");
         consolidateResult(results, ids, categories);
-        String outputTable = outputTableName != null ? outputTableName : tableName;
+        String outputTable = outputTableName != null ? outputTableName : commonFrontEnd.getTableName();
         if (outputCodeCol != null) {
             System.err.println("Inserting result into database");
-            outputToDatabase(dataSourceFileName,
-                    outputTable,
-                    idColumn,
+            commonFrontEnd.outputToDatabase(outputTable,
                     outputCodeCol,
                     ids,
                     categories);
@@ -259,45 +222,4 @@ public class Main implements Callable<Void> {
         }
     }
 
-    /**
-     * Method to write the classification results to the database
-     *
-     * @param dataSourceFileName The file containing the datasource
-     * @param tableName The name of the table
-     * @param idColumn The column containing the ID
-     * @param outputCodeCol The column where the results are set
-     * @param ids The list of ids
-     * @param cats The corresponding list if categories.
-     */
-    public static void outputToDatabase(
-            String dataSourceFileName,
-            String tableName,
-            String idColumn,
-            String outputCodeCol,
-            List<String> ids,
-            List<Integer> cats) {
-        try {
-            SimpleDataSource sds = new SimpleDataSource(dataSourceFileName);
-            try (Connection conn = sds.getConnection();
-                    Statement stmt = conn.createStatement();) {
-                stmt.executeUpdate("DROP TABLE IF EXISTS NewCodes");
-                stmt.executeUpdate("CREATE TABLE NewCodes (ID char(11) primary key, Code int)");
-                StringBuilder stb = new StringBuilder("INSERT INTO NewCodes (ID, Code) VALUES");
-                StringJoiner sj = new StringJoiner(",\n");
-                for (int i = 0; i < ids.size(); i++) {
-                    sj.add(String.format("(\'%s\', %d)", ids.get(i), cats.get(i)));
-                }
-                stb.append(sj);
-                stmt.executeUpdate(stb.toString());
-                stmt.executeUpdate("UPDATE " + tableName + " join NewCodes on "
-                        + tableName + ".ID=NewCodes.ID SET " + tableName + "."
-                        + outputCodeCol + "=NewCodes.Code");
-            } catch (SQLException ex) {
-                throw ex;
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            System.exit(1);
-        }
-    }
 }
