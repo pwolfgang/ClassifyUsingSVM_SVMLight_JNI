@@ -134,7 +134,7 @@ public class Main implements Callable<Void> {
             System.err.println("Inserting result into database");
             commonFrontEnd.outputToDatabase(outputTable,
                     outputCodeCol,
-                    cases);
+                    cases, "newCode");
         }
         System.err.println("SUCESSFUL COMPLETION");
         return null;
