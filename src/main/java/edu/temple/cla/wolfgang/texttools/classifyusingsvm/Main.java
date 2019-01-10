@@ -35,9 +35,9 @@ import edu.temple.cla.papolicy.wolfgang.texttools.util.CommonFrontEnd;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Util;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.Vocabulary;
 import edu.temple.cla.papolicy.wolfgang.texttools.util.WordCounter;
+import edu.temple.cla.wolfgang.jnisvmlight.SVMLight;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,9 +47,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
-import tw.edu.ntu.csie.libsvm.svm;
-import tw.edu.ntu.csie.libsvm.svm_model;
-import tw.edu.ntu.csie.libsvm.svm_node;
 
 /**
  *
@@ -78,6 +75,8 @@ public class Main implements Callable<Void> {
     private String resultDir = "SVM_Classification_Results";
 
     private final String[] args;
+
+    private static final SVMLight svmLight = new SVMLight();
     
     public Main(String[] args) {
         this.args = args;
@@ -105,14 +104,14 @@ public class Main implements Callable<Void> {
      */
     @Override
     public Void call() {
-
+        long start = System.nanoTime();
         CommonFrontEnd commonFrontEnd = new CommonFrontEnd();
         CommandLine commandLine = new CommandLine(commonFrontEnd);
         commandLine.setUnmatchedArgumentsAllowed(true);
         commandLine.parse(args);
         List<Map<String, Object>> cases = new ArrayList<>();
+        List<SortedMap<Integer, Double>> docs = new ArrayList<>();
         Vocabulary unusedVocab = commonFrontEnd.loadData(cases);
-        List<svm_node[]> problems = new ArrayList<>();
         File modelParent = new File(modelDir);
         File vocabFile = new File(modelParent, "vocab.bin");
         Vocabulary vocabulary = null; //The model vocabulary
@@ -122,11 +121,12 @@ public class Main implements Callable<Void> {
             ex.printStackTrace();
             System.exit(1);
         }
+        double gamma = 1.0 / vocabulary.numFeatures();
         for (Map<String, Object> c : cases) {
-            problems.add(Util.convereToSVMNode(Util.computeAttributes((WordCounter)c.get("counts"), vocabulary, 0)));    
+            docs.add(Util.computeAttributes((WordCounter)c.get("counts"), vocabulary, gamma));
         }
         SortedMap<Integer, Map<String, Integer>> results = new TreeMap<>();
-        classifyTest(modelParent, problems, results);
+        classifyTest(modelParent, docs, results);
         System.err.println("Consolidating Results");
         consolidateResult(results, cases);
         String outputTable = outputTableName != null ? outputTableName : commonFrontEnd.getTableName();
@@ -136,6 +136,9 @@ public class Main implements Callable<Void> {
                     outputCodeCol,
                     cases, "newCode");
         }
+        System.err.println("SUCESSFUL COMPLETION");
+        long end = System.nanoTime();
+        System.err.println("TOTAL TIME " + (end-start)/1.0e9 + "sec.");
         System.err.println("SUCESSFUL COMPLETION");
         return null;
     }
@@ -149,7 +152,7 @@ public class Main implements Callable<Void> {
      */
     public static void classifyTest(
             File modelDir,
-            List<svm_node[]> problems,
+            List<SortedMap<Integer, Double>> problems,
             SortedMap<Integer, Map<String, Integer>> results) {
         String[] modelFileNames = modelDir.list();
         for (String modelFileName : modelFileNames) {
@@ -160,17 +163,11 @@ public class Main implements Callable<Void> {
                         = modelFileName.substring(posFirstDot + 1, posSecondDot);
                 String negModel = modelFileName.substring(posSecondDot + 1);
                 File modelFile = new File(modelDir, modelFileName);
-                svm_model model = null;
-                System.out.println("Reading model " + modelFile);
-                try {
-                    model = svm.svm_load_model(modelFile.getPath());
-                } catch (IOException ioex) {
-                    throw new RuntimeException("Error reading model", ioex);
-                }
+                String modelFilePath = modelFile.getPath();
+                double[] dists = svmLight.SVMClassify(modelFilePath, problems, problems.size());
                 for (int i = 0; i < problems.size(); i++) {
-                    double result = svm.svm_predict(model, problems.get(i));
                     Map<String, Integer> resultMap = results.getOrDefault(i, new HashMap<>());
-                    if (result > 0) {
+                    if (dists[i] > 0) {
                         int countOfCat = resultMap.getOrDefault(posModel, 0);
                         countOfCat++;
                         resultMap.put(posModel, countOfCat);
