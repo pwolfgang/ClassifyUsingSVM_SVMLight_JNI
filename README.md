@@ -51,3 +51,15 @@ is performed. The default is TRUE</dd>
 stemmers were obtained from http://snowball.tartarus.org. The one for 
 English is an improvement over Porter’s original.
   Default is true</dd>
+
+
+## DataSource
+The datasource is defined by a text file that is used to construct a class that
+implements the `java.sql.DataSource` interface. The format of this file is as
+follows:
+```
+jdbc.driver:    *driver class name*
+jdbc.url:       *database URL*
+jdbc.username:  *database user name*
+jdbc.password:  *database password*
+```
