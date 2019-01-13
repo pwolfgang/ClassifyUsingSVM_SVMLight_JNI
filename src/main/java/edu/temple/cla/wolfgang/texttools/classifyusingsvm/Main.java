@@ -49,7 +49,18 @@ import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
 /**
- *
+ * Program to classify text using SVM.  This program classifies text samples
+ * (e.g. bills and resolutions) following the algorithm described by
+ * Purpura, S., Hillard D. 
+ * <a href="www.purpuras.net/dgo2006%20Purpura%20Hillard%20Classifying%20Congressional%20Legislation.pdf"> 
+ * Automated Classification of Congressional Legislation </a> Proceedings of the 
+ * Seventh International Conference on Digital Government Research. San Diego, CA. 
+ * It adapted from <a href="http://www.purpuras.net/pac/run-svm-text.html"> run_svm.pl </a>.
+ * Each sample is tested against pair-wise classifiers for each pair of categories.
+ * The category with the largest number of positive results is considered the resulting
+ * category. 
+ * The actual SVM calculations are performed using <a href="http://svmlight.joachims.org/"> svm_light </a>
+ * by calling svm_classify through a JNI bridge (JNISvmLight).
  * @author Paul Wolfgang
  */
 public class Main implements Callable<Void> {

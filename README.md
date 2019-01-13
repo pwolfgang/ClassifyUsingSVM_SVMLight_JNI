@@ -39,13 +39,15 @@ SVM_Classification_Results<dd>
 <dl>--compute_major</dl><dd>If specified, the major code is computed from the minor code
   Default is false</dd>
 <dl>--remove_stopwords [TRUE|FALSE|language]</dl>
-<dd>If true, remove common “stop words” from the text using language specific 
-stop words defined by Chris Buckley and Gerard Salton. If a language is omitted, 
-the stop words are those provided by Porter.
-  Default is true</dd>
+<dd>If a language is specified, remove common “stop words” from the text using language specific 
+stop words defined obtained from <a href="http://snowball.tartarus.org/dist/snowball_all.tgz">
+http://snowball.tartarus.org/dist/snowball_all.tgz </a> If TRUE, 
+the stop words are those provided by Chris Buckley and Gerard Salton 
+http://www.lextek.com/manuals/onix/stopwords2.html. If FALSE, no stopword filtering
+is performed. The default is TRUE</dd>
 <dl>--do_stemming [TRUE|FALSE|language]</dl>
 <dd>If true, pass all words through the Porter stemmer. If a language is specified
  pass all words through a language-specific stemmer. The language specific 
-stemmers are also defined by Porter. The one for English is an improvement over 
-Porter’s original.
+stemmers were obtained from http://snowball.tartarus.org. The one for 
+English is an improvement over Porter’s original.
   Default is true</dd>
