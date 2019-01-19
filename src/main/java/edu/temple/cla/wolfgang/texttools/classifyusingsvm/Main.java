@@ -49,22 +49,23 @@ import java.util.concurrent.Callable;
 import picocli.CommandLine;
 
 /**
- * Program to classify text using SVM.  This program classifies text samples
- * (e.g. bills and resolutions) following the algorithm described by
- * Purpura, S., Hillard D. 
- * <a href="www.purpuras.net/dgo2006%20Purpura%20Hillard%20Classifying%20Congressional%20Legislation.pdf"> 
- * Automated Classification of Congressional Legislation </a> Proceedings of the 
- * Seventh International Conference on Digital Government Research. San Diego, CA. 
- * It adapted from <a href="http://www.purpuras.net/pac/run-svm-text.html"> run_svm.pl </a>.
- * Each sample is tested against pair-wise classifiers for each pair of categories.
- * The category with the largest number of positive results is considered the resulting
- * category. 
- * The actual SVM calculations are performed using <a href="http://svmlight.joachims.org/"> svm_light </a>
+ * Program to classify text using SVM. This program classifies text samples
+ * (e.g. bills and resolutions) following the algorithm described by Purpura,
+ * S., Hillard D.
+ * <a href="www.purpuras.net/dgo2006%20Purpura%20Hillard%20Classifying%20Congressional%20Legislation.pdf">
+ * Automated Classification of Congressional Legislation </a> Proceedings of the
+ * Seventh International Conference on Digital Government Research. San Diego,
+ * CA. It adapted from <a href="http://www.purpuras.net/pac/run-svm-text.html">
+ * run_svm.pl </a>. Each sample is tested against pair-wise classifiers for each
+ * pair of categories. The category with the largest number of positive results
+ * is considered the resulting category. The actual SVM calculations are
+ * performed using <a href="http://svmlight.joachims.org/"> svm_light </a>
  * by calling svm_classify through a JNI bridge (JNISvmLight).
+ *
  * @author Paul Wolfgang
  */
 public class Main implements Callable<Void> {
-    
+
     @CommandLine.Option(names = "--output_table_name",
             description = "Table where results are written")
     private String outputTableName;
@@ -88,10 +89,11 @@ public class Main implements Callable<Void> {
     private final String[] args;
 
     private static final SVMLight svmLight = new SVMLight();
-    
+
     public Main(String[] args) {
         this.args = args;
     }
+
     /**
      * @param args the command line arguments
      */
@@ -105,7 +107,6 @@ public class Main implements Callable<Void> {
             throw new RuntimeException(ex);
         }
     }
-
 
     /**
      * Execute the main program. This method is called after the command line
@@ -134,7 +135,7 @@ public class Main implements Callable<Void> {
         }
         double gamma = 1.0 / vocabulary.numFeatures();
         for (Map<String, Object> c : cases) {
-            docs.add(Util.computeAttributes((WordCounter)c.get("counts"), vocabulary, gamma));
+            docs.add(Util.computeAttributes((WordCounter) c.get("counts"), vocabulary, gamma));
         }
         SortedMap<Integer, Map<String, Integer>> results = new TreeMap<>();
         classifyTest(modelParent, docs, results);
@@ -149,15 +150,15 @@ public class Main implements Callable<Void> {
         }
         System.err.println("SUCESSFUL COMPLETION");
         long end = System.nanoTime();
-        System.err.println("TOTAL TIME " + (end-start)/1.0e9 + "sec.");
+        System.err.println("TOTAL TIME " + (end - start) / 1.0e9 + "sec.");
         System.err.println("SUCESSFUL COMPLETION");
         return null;
     }
 
     /**
-     * Function to run the test file agains each of the SVM models
+     * Function to run the test file against each of the SVM models
      *
-     * @param modelDir The the directory containg the models
+     * @param modelDir The the directory containing the models
      * @param problems The list of problems to be classified
      * @param results Map of problem indices vs list of results.
      */
@@ -165,9 +166,9 @@ public class Main implements Callable<Void> {
             File modelDir,
             List<SortedMap<Integer, Double>> problems,
             SortedMap<Integer, Map<String, Integer>> results) {
-        String[] modelFileNames = modelDir.list();
-        for (String modelFileName : modelFileNames) {
-            if (modelFileName.startsWith("svm")) {
+        String[] modelFileNames = modelDir.list((f, n) -> n.startsWith("svm"));
+        if (modelFileNames.length > 0) {
+            for (String modelFileName : modelFileNames) {
                 int posFirstDot = modelFileName.indexOf('.');
                 int posSecondDot = modelFileName.indexOf('.', posFirstDot + 1);
                 String posModel
@@ -190,15 +191,26 @@ public class Main implements Callable<Void> {
                     results.put(i, resultMap);
                 }
             }
+        } else {
+            String modelDirName = modelDir.getName();
+            int lastIndexOfUC = modelDirName.lastIndexOf("_");
+            if (lastIndexOfUC > 0) {
+                String cat = modelDirName.substring(lastIndexOfUC+1) + "00";
+                Map<String, Integer> defaultMap = new HashMap<>();
+                defaultMap.put(cat, 1);
+                for (int i = 0; i < problems.size(); i++) {
+                    results.put(i, defaultMap);
+                }
+            }
         }
     }
 
     /**
-     * Method to consolidate the results of SVM model testing. Each entry in
-     * the map results contains the results of running each record against
-     * each pair of categories. This is itself a map of category mapped to the
-     * number of times that category was chosen. The category with the highest
-     * count is considered the winning category.
+     * Method to consolidate the results of SVM model testing. Each entry in the
+     * map results contains the results of running each record against each pair
+     * of categories. This is itself a map of category mapped to the number of
+     * times that category was chosen. The category with the highest count is
+     * considered the winning category.
      *
      * @param results The Map of problems indexed to Map of category counts.
      * @param cases The list of cases to be classified.
