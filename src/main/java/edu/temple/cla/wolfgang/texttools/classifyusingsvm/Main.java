@@ -224,7 +224,15 @@ public class Main implements Callable<Void> {
             result.forEach((k, v) -> invertedResult.put(v, k));
             Integer maxKey = invertedResult.lastKey();
             String winningCategory = invertedResult.get(maxKey);
-            cases.get(i).put("newCode", new Integer(winningCategory));
+            int winningCategoryInt;
+            if (winningCategory.equalsIgnoreCase("true")) {
+                winningCategoryInt = 1;
+            } else if (winningCategory.equalsIgnoreCase("false")) {
+                winningCategoryInt = 0;
+            } else {
+                winningCategoryInt = Integer.parseInt(winningCategory);
+            }
+            cases.get(i).put("newCode", winningCategoryInt);
         }
     }
 
